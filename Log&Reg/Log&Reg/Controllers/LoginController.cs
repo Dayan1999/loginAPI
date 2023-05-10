@@ -1,7 +1,9 @@
 ﻿using Log_Reg.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Data.SqlClient;
+using System.Text;
 
 namespace Log_Reg.Controllers
 {
@@ -11,19 +13,45 @@ namespace Log_Reg.Controllers
 	{
 		private string connectionString = "Data Source=LAPTOP-06GAVR62\\SQLEXPRESS;Initial Catalog=Users;Integrated Security=True";
 
+		// POST api/login
 		[HttpPost]
 		public ActionResult Post(LoginModel model)
 		{
 			// Check if email exists in the database
 			if (!IsEmailExists(model.Email))
 			{
-				return BadRequest("Invalid email address or password.");
+				return BadRequest("Invalid email address.");
 			}
 
-			// Check if password is correct
-			if (!IsPasswordCorrect(model.Email, model.Password))
+			// Retrieve the password from the database
+			string passwordHash = "";
+			using (SqlConnection connection = new SqlConnection(connectionString))
 			{
-				return BadRequest("Invalid email address or password.");
+				string query = "SELECT Password FROM UserInf WHERE Email=@Email";
+				using (SqlCommand command = new SqlCommand(query, connection))
+				{
+					command.Parameters.AddWithValue("@Email", model.Email);
+					connection.Open();
+					var result = command.ExecuteScalar();
+					if (result != null)
+					{
+						passwordHash = result.ToString();
+					}
+				}
+			}
+
+			// Decrypt the password
+			string password = "";
+			if (!string.IsNullOrEmpty(passwordHash))
+			{
+				byte[] passwordBytes = Convert.FromBase64String(passwordHash);
+				password = Encoding.UTF8.GetString(passwordBytes);
+			}
+
+			// Check if the password matches
+			if (password != model.Password)
+			{
+				return BadRequest("Invalid password.");
 			}
 
 			return Ok("Login successful.");
@@ -38,23 +66,6 @@ namespace Log_Reg.Controllers
 				using (SqlCommand command = new SqlCommand(query, connection))
 				{
 					command.Parameters.AddWithValue("@Email", email);
-					connection.Open();
-					int count = (int)command.ExecuteScalar();
-					return count > 0;
-				}
-			}
-		}
-
-		private bool IsPasswordCorrect(string email, string password)
-		{
-			// Check if password is correct for the given email
-			using (SqlConnection connection = new SqlConnection(connectionString))
-			{
-				string query = "SELECT COUNT(*) FROM UserInf WHERE Email=@Email AND Password=@Password";
-				using (SqlCommand command = new SqlCommand(query, connection))
-				{
-					command.Parameters.AddWithValue("@Email", email);
-					command.Parameters.AddWithValue("@Password", password);
 					connection.Open();
 					int count = (int)command.ExecuteScalar();
 					return count > 0;

@@ -1,7 +1,9 @@
 ﻿using Log_Reg.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Data.SqlClient;
+using System.Text;
 
 namespace Log_Reg.Controllers
 {
@@ -36,6 +38,9 @@ namespace Log_Reg.Controllers
 			// Set created date time
 			model.CreatedDate = DateTime.UtcNow;
 
+			// Encrypt password using Base64 string encoding
+			string encryptedPassword = Convert.ToBase64String(Encoding.ASCII.GetBytes(model.Password));
+
 			// Insert data into database
 			using (SqlConnection connection = new SqlConnection(connectionString))
 			{
@@ -43,7 +48,7 @@ namespace Log_Reg.Controllers
 				using (SqlCommand command = new SqlCommand(query, connection))
 				{
 					command.Parameters.AddWithValue("@Email", model.Email);
-					command.Parameters.AddWithValue("@Password", model.Password);
+					command.Parameters.AddWithValue("@Password", encryptedPassword);
 					command.Parameters.AddWithValue("@CreatedDateTime", model.CreatedDate);
 					connection.Open();
 					int result = command.ExecuteNonQuery();
@@ -85,5 +90,4 @@ namespace Log_Reg.Controllers
 			}
 		}
 	}
-
 }
